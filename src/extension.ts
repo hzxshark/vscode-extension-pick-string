@@ -1,39 +1,66 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
+// @ts-nocheck
 import * as vscode from 'vscode';
 
-// this method is called when your extension is activated
-// your extension is activated the very first time the command is executed
-export function activate(context: vscode.ExtensionContext) {
-	
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "pick-string" is now active!');
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	let disposable = vscode.commands.registerCommand('pick-string.pickI18n', () => {
-		// 新建一个用于输出key value值的 channel
-		const chanel =  vscode.window.createOutputChannel('i18n key');
+const regex = /i18n\((.*?|\n*?)\)/g;
+
+export function activate(context: vscode.ExtensionContext) {
+	// 注册一个插件命令
+	let disposable = vscode.commands.registerCommand(
+	  "pick-string.pickI18n",
+	  async () => {
+		
 		// 获取当前文件的内容
-		const currentContext:string = vscode.window.activeTextEditor.document.getText();
-		// 把当前文件内容进行pick
-		const i18nText = currentContext.toString().match(regex).join('&_&');
+		const currentContext = vscode.window.activeTextEditor?.document.getText();
+		// 根据'i18n'关键字筛选出key值
+		const i18nText = currentContext?.match(regex).join("&_&");
 		// 格式化成需要的csv格式
 		const finalText = i18nText
-		.replace(/i18n\(/g, '')
-		.replace(/\)/g, '')
-		.replace(/&_&/g, '\n')
-		.replace(/'/g, '')
-		.replace(/\x20/g,'')
-		vscode.window.showInformationMessage(typeof currentContext);
-		// 把最后的内容输出到控制台
-		chanel.append(finalText)
-	});
+		  .replace(/i18n\(|\)|\s/g, "")
+		  .replace(/&_&/g, "\n")
+		  .replace(/'|`|\x20|\$/g, "");
 
+		// 《《《《 test-start
+		// 新建一个用于输出key value值的 channel
+		const chanel = vscode.window.createOutputChannel("i18n key");
+		// 输出
+		chanel.append(finalText);
+		// 》》》》》test-end
+  
+		// 保存文件名称确认弹窗
+		let uri = await vscode.window.showSaveDialog({
+		  filters: {
+			csv: ["csv"],
+		  },
+		});
+  
+		//   容错
+		if (uri == undefined) {
+		  vscode.window.showErrorMessage("无效的保存路径");
+		  return;
+		}
+  
+		// 生成csv buffer
+		let writeData = Buffer.from(finalText, "utf8");
+  
+		// 写入文件
+		vscode.workspace.fs.writeFile(uri, writeData);
+  
+		let openFile = "打开文件";
+  
+		// 提示保存成功
+		vscode.window
+		  .showInformationMessage("文件保存成功", openFile)
+		  .then((value) => {
+			if (value === openFile) {
+			  vscode.window.showTextDocument(uri!, {});
+			}
+		  });
+	  }
+	);
+  
 	context.subscriptions.push(disposable);
-}
+  }
 
 // this method is called when your extension is deactivated
 export function deactivate() {}
